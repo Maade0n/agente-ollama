@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini agente de código</title>
+<style>
+  :root {
+    --fondo: #0f1117; --panel: #181b23; --borde: #2a2f3c;
+    --texto: #e6e8ee; --gris: #8b90a0; --acento: #7aa2f7; --verde: #9ece6a;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--fondo); color: var(--texto);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  header {
+    padding: 14px 20px; border-bottom: 1px solid var(--borde);
+    display: flex; align-items: center; gap: 12px;
+  }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header .modelo { color: var(--gris); font-size: 13px; }
+  header button {
+    margin-left: auto; background: none; border: 1px solid var(--borde);
+    color: var(--gris); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  }
+  header button:hover { color: var(--texto); border-color: var(--gris); }
+
+  #chat { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 75%; padding: 10px 14px; border-radius: 12px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+  .usuario { align-self: flex-end; background: var(--acento); color: #0f1117; border-bottom-right-radius: 4px; }
+  .agente  { align-self: flex-start; background: var(--panel); border: 1px solid var(--borde); border-bottom-left-radius: 4px; }
+  .paso    { align-self: flex-start; color: var(--gris); font-size: 12.5px; font-family: Consolas, monospace; padding: 0 6px; max-width: 90%; }
+  .paso.herramienta { color: var(--verde); }
+  .escribiendo { color: var(--gris); font-style: italic; }
+
+  footer { padding: 14px 20px; border-top: 1px solid var(--borde); }
+  #fila-input { display: flex; gap: 10px; }
+  #mensaje {
+    flex: 1; background: var(--panel); border: 1px solid var(--borde);
+    color: var(--texto); border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;
+  }
+  #mensaje:focus { border-color: var(--acento); }
+  #enviar {
+    background: var(--acento); color: #0f1117; border: none; border-radius: 10px;
+    padding: 0 22px; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  #enviar:disabled { opacity: .4; cursor: default; }
+  label { display: flex; align-items: center; gap: 6px; color: var(--gris); font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 Mini agente de código</h1>
+  <span class="modelo">qwen3.5:4b · local con Ollama</span>
+  <button onclick="reiniciar()">Nueva conversación</button>
+</header>
+
+<div id="chat">
+  <div class="msg agente">¡Hola! Soy tu agente de código. Pídeme algo como:
+"crea un script fizzbuzz.py del 1 al 15 y ejecútalo para comprobar que funciona".
+Lo que cree aparecerá en la carpeta <b>workspace</b>.</div>
+</div>
+
+<footer>
+  <div id="fila-input">
+    <input id="mensaje" placeholder="Escribe tu petición..." autocomplete="off">
+    <button id="enviar" onclick="enviar()">Enviar</button>
+  </div>
+  <label><input type="checkbox" id="permitir"> Permitir que ejecute comandos de terminal (dentro del workspace)</label>
+</footer>
+
+<script>
+const chat = document.getElementById("chat");
+const input = document.getElementById("mensaje");
+const boton = document.getElementById("enviar");
+
+input.addEventListener("keydown", e => { if (e.key === "Enter") enviar(); });
+
+function burbuja(clase, texto) {
+  const div = document.createElement("div");
+  div.className = clase;
+  div.textContent = texto;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+async function enviar() {
+  const texto = input.value.trim();
+  if (!texto || boton.disabled) return;
+  input.value = "";
+  boton.disabled = true;
+  burbuja("msg usuario", texto);
+  const espera = burbuja("paso escribiendo", "el agente está pensando...");
+
+  try {
+    const resp = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mensaje: texto,
+        permitir_comandos: document.getElementById("permitir").checked,
+      }),
+    });
+
+    // Leemos el streaming: una línea JSON por evento
+    const lector = resp.body.getReader();
+    const decodificador = new TextDecoder();
+    let resto = "";
+    while (true) {
+      const { value, done } = await lector.read();
+      if (done) break;
+      resto += decodificador.decode(value, { stream: true });
+      const lineas = resto.split("\n");
+      resto = lineas.pop(); // la última puede venir incompleta
+      for (const linea of lineas) {
+        if (!linea.trim()) continue;
+        const ev = JSON.parse(linea);
+        if (ev.tipo === "pensando")     burbuja("paso", "💭 " + ev.texto);
+        else if (ev.tipo === "herramienta") burbuja("paso herramienta", "🔧 " + ev.texto);
+        else if (ev.tipo === "resultado")   burbuja("paso", "   ↳ " + ev.texto);
+        else if (ev.tipo === "final")       burbuja("msg agente", ev.texto);
+      }
+    }
+  } catch (e) {
+    burbuja("msg agente", "Error de conexión: " + e.message +
+            "\n¿Está Ollama encendido y el servidor corriendo?");
+  } finally {
+    espera.remove();
+    boton.disabled = false;
+    input.focus();
+  }
+}
+
+async function reiniciar() {
+  await fetch("/reiniciar", { method: "POST" });
+  chat.innerHTML = "";
+  burbuja("msg agente", "Memoria borrada. ¡Empezamos de cero!");
+}
+</script>
+</body>
+</html>

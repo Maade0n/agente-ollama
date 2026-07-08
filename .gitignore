@@ -1,0 +1,7 @@
+# Python
+__pycache__/
+*.pyc
+
+# Archivos que el agente genera al trabajar (no forman parte del código)
+workspace/*
+!workspace/.gitkeep
