@@ -8,7 +8,7 @@ Solución de los 4 retos del PDF `ejercicios_martes_alumnos`, 100% local (sin to
 
 ## Cómo ejecutarlo
 ```bash
-pip install qiskit numpy matplotlib
+pip install qiskit numpy matplotlib   # en Colab: !pip install -q qiskit
 jupyter notebook Tema11_Bloque2_Retos_Hamiltoniano.ipynb
 ```
 Solo se usa `qiskit.quantum_info` (cálculo local). No se requiere cuenta, token ni PySCF.
