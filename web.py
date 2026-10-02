@@ -10,12 +10,13 @@ Ejecutar:  python web.py   ->  se abre http://127.0.0.1:5000
 """
 
 import json
+import os
 import sys
 import threading
 import webbrowser
 
 import ollama
-from flask import Flask, Response, render_template, request
+from flask import Flask, Response, render_template, request, send_from_directory
 
 import tools
 from agent import MAX_ITERACIONES, MODELO, SYSTEM_PROMPT
@@ -35,6 +36,22 @@ def evento(tipo: str, texto: str) -> str:
 @app.get("/")
 def index():
     return render_template("index.html")
+
+
+# --- Juego de ajedrez con entrenador (todo en el navegador, sin Ollama) ---
+AJEDREZ_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ajedrez")
+
+
+@app.get("/ajedrez")
+def ajedrez():
+    """El entrenador de ajedrez: una app aparte, 100% JavaScript en el
+    navegador. No usa el modelo ni Ollama, así que funciona siempre."""
+    return send_from_directory(AJEDREZ_DIR, "index.html")
+
+
+@app.get("/ajedrez/<path:archivo>")
+def ajedrez_static(archivo):
+    return send_from_directory(AJEDREZ_DIR, archivo)
 
 
 @app.post("/reiniciar")

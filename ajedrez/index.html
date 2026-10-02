@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chess Coach — learn chess & English</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #181b23; --border: #2a2f3c;
+    --text: #e6e8ee; --muted: #8b90a0; --accent: #7aa2f7;
+    --green: #9ece6a; --red: #f7768e; --yellow: #e0af68; --orange: #ff9e64;
+    --light: #ebecd0; --dark: #739552;      /* board squares */
+    --sel: #f6f669;  --hint: rgba(0,0,0,.28); --last: #bbca4a;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.5;
+    min-height: 100vh;
+  }
+  header {
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 17px; font-weight: 600; }
+  header .tag { color: var(--muted); font-size: 13px; }
+
+  main {
+    display: grid; grid-template-columns: minmax(320px, 1fr) 380px;
+    gap: 22px; padding: 22px; max-width: 1180px; margin: 0 auto;
+    align-items: start;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+  /* ---- board ---- */
+  .board-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  #board {
+    width: min(78vw, 560px); aspect-ratio: 1; display: grid;
+    grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
+    border: 3px solid var(--border); border-radius: 6px; overflow: hidden;
+    user-select: none;
+  }
+  .sq { position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .sq.light { background: var(--light); }
+  .sq.dark  { background: var(--dark); }
+  .sq.sel   { background: var(--sel) !important; }
+  .sq.last  { box-shadow: inset 0 0 0 100px rgba(187,202,74,.38); }
+  .sq .piece { font-size: min(10vw, 64px); line-height: 1; pointer-events: none;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+  .sq .piece.w { color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 1px #000; }
+  .sq .piece.b { color: #222; text-shadow: 0 0 1px #000; }
+  .sq .hint {
+    position: absolute; width: 30%; height: 30%; border-radius: 50%;
+    background: var(--hint); pointer-events: none;
+  }
+  .sq .hint.capture {
+    width: 86%; height: 86%; background: none; border-radius: 50%;
+    box-shadow: inset 0 0 0 6px var(--hint);
+  }
+  .sq .coord { position: absolute; font-size: 10px; color: rgba(0,0,0,.45); }
+  .sq .coord.file { bottom: 2px; right: 3px; }
+  .sq .coord.rank { top: 2px; left: 3px; }
+  .sq.dark .coord { color: rgba(235,236,208,.7); }
+
+  .status { font-size: 15px; min-height: 24px; text-align: center; }
+  .status b { color: var(--accent); }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  button, select {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 9px; padding: 9px 14px; font-size: 14px; cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); color: #0f1117; border: none; font-weight: 600; }
+  label.opt { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+
+  /* ---- side panel ---- */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin-bottom: 10px; }
+
+  #coach .verdict { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  #coach .badge { font-weight: 700; font-size: 18px; padding: 2px 10px; border-radius: 8px;
+    background: #222634; }
+  #coach .move { color: var(--muted); font-size: 14px; }
+  #coach .best { color: var(--accent); font-weight: 600; }
+  #coach .explain p { margin: 6px 0; }
+  .k-best, .k-great { color: var(--green); }
+  .k-good { color: var(--text); }
+  .k-inaccuracy { color: var(--yellow); }
+  .k-mistake { color: var(--orange); }
+  .k-blunder { color: var(--red); }
+  .coach-face { font-size: 13px; color: var(--muted); font-style: italic; margin-top: 10px; }
+
+  #moves { max-height: 220px; overflow-y: auto; font-family: Consolas, monospace; font-size: 14px; }
+  #moves table { width: 100%; border-collapse: collapse; }
+  #moves td { padding: 3px 6px; }
+  #moves td.n { color: var(--muted); width: 32px; }
+  #moves td.m:hover { color: var(--accent); }
+
+  details.glossary summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  details.glossary dl { margin-top: 10px; font-size: 13.5px; }
+  details.glossary dt { color: var(--accent); font-weight: 600; margin-top: 8px; }
+  details.glossary dd { margin: 2px 0 0; color: var(--muted); }
+
+  .think { color: var(--muted); font-style: italic; }
+
+  /* promotion dialog */
+  #promo { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+    align-items: center; justify-content: center; z-index: 10; }
+  #promo .box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; text-align: center; }
+  #promo .choices { display: flex; gap: 10px; margin-top: 12px; }
+  #promo .choices button { font-size: 40px; padding: 6px 12px; line-height: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>♟️ Chess Coach</h1>
+  <span class="tag">Play a game, learn chess technique, and practise your English — the coach explains every move.</span>
+</header>
+
+<main>
+  <div class="board-wrap">
+    <div id="board"></div>
+    <div class="status" id="status">White to move. Make your move!</div>
+    <div class="controls">
+      <button class="primary" id="newgame">New game</button>
+      <button id="takeback">Take back</button>
+      <label class="opt">Play as
+        <select id="side">
+          <option value="w" selected>White</option>
+          <option value="b">Black</option>
+        </select>
+      </label>
+      <label class="opt">Coach strength
+        <select id="level">
+          <option value="2">Beginner</option>
+          <option value="3" selected>Club player</option>
+          <option value="4">Strong</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="card" id="coach">
+      <h2>Coach</h2>
+      <div id="coach-body">
+        <p class="think">Make a move and I'll tell you — in English — whether it
+        was the best move, and <em>why</em> or <em>why not</em>, using real
+        chess technique.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Moves</h2>
+      <div id="moves"><table><tbody></tbody></table></div>
+    </div>
+
+    <div class="card">
+      <details class="glossary">
+        <summary>Chess vocabulary (English practice)</summary>
+        <dl>
+          <dt>to develop a piece</dt><dd>to bring a knight or bishop off its starting square, into the game.</dd>
+          <dt>to castle</dt><dd>the special king + rook move that makes your king safe.</dd>
+          <dt>to hang a piece</dt><dd>to leave a piece undefended, so the opponent can win it for free.</dd>
+          <dt>to capture / to take</dt><dd>to remove an opponent's piece: "I'll take the knight."</dd>
+          <dt>to defend / to attack</dt><dd>a defended piece can be recaptured; an attacked piece is in danger.</dd>
+          <dt>the centre</dt><dd>the four middle squares (d4, e4, d5, e5) — controlling them is a key goal.</dd>
+          <dt>a blunder</dt><dd>a very bad move that loses material or the game.</dd>
+          <dt>check / checkmate</dt><dd>the king is attacked / the king is trapped and the game ends.</dd>
+          <dt>a pin / a fork</dt><dd>tactics: a pinned piece can't move; a fork attacks two things at once.</dd>
+          <dt>tempo</dt><dd>a unit of time; "to lose a tempo" means to waste a move.</dd>
+        </dl>
+      </details>
+    </div>
+  </div>
+</main>
+
+<div id="promo"><div class="box">
+  <div>Choose a piece to promote to:</div>
+  <div class="choices" id="promo-choices"></div>
+</div></div>
+
+<script src="engine.js"></script>
+<script src="coach.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

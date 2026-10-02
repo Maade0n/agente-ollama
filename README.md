@@ -76,6 +76,19 @@ Ejemplos de peticiones para probar:
 4. `qwen3.5:4b` es un modelo *razonador*: verás su "pensamiento" en gris antes
    de cada acción.
 
+## ♟️ Extra: Chess Coach (aprende ajedrez + practica inglés)
+
+En la carpeta [`ajedrez/`](ajedrez/) hay un juego de ajedrez con un **entrenador
+profesional** que te explica cada jugada **en inglés**: si fue la mejor y por
+qué o por qué no, con técnica real (desarrollo, centro, piezas colgadas…). Así
+practicas inglés mientras aprendes ajedrez.
+
+- Ábrelo con doble clic en `ABRIR_AJEDREZ.bat` (o abre `ajedrez/index.html`).
+  **No necesita Ollama ni Flask** — es 100% JavaScript en el navegador.
+- O desde el servidor: `python web.py` → <http://127.0.0.1:5000/ajedrez>.
+
+Detalles y cómo está hecho por dentro: [`ajedrez/README.md`](ajedrez/README.md).
+
 ## Ideas para seguir practicando
 
 - Añadir una herramienta `editar_archivo(buscar, reemplazar)` en vez de
